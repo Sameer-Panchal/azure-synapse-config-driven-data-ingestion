@@ -1,0 +1,38 @@
+{
+	"name": "ds_advent",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_gen2",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"sink_param_container": {
+				"type": "string"
+			},
+			"sink_param_folder": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"folderPath": {
+					"value": "@concat(dataset().sink_param_folder,formatDateTime(utcNow(),'/yyyy/MM/dd'))",
+					"type": "Expression"
+				},
+				"fileSystem": {
+					"value": "@dataset().sink_param_container",
+					"type": "Expression"
+				}
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

@@ -1,0 +1,31 @@
+{
+	"name": "AzureSynapseDB",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureSynapseDB",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"ds_param_schema": {
+				"type": "string"
+			},
+			"ds_param_table": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "AzureSqlDWTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": {
+				"value": "@dataset().ds_param_schema",
+				"type": "Expression"
+			},
+			"table": {
+				"value": "@dataset().ds_param_table",
+				"type": "Expression"
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

@@ -1,0 +1,17 @@
+{
+	"name": "AzureSynapseAnalytics1",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"annotations": [],
+		"type": "AzureSqlDW",
+		"typeProperties": {
+			"server": "sqlanalyticstest0903.sql.azuresynapse.net",
+			"database": "azurededicatedsqlpooltest",
+			"encrypt": "mandatory",
+			"trustServerCertificate": false,
+			"authenticationType": "SQL",
+			"userName": "sqladminuser",
+			"encryptedCredential": "ew0KICAiVmVyc2lvbiI6ICIyMDE3LTExLTMwIiwNCiAgIlByb3RlY3Rpb25Nb2RlIjogIktleSIsDQogICJTZWNyZXRDb250ZW50VHlwZSI6ICJQbGFpbnRleHQiLA0KICAiQ3JlZGVudGlhbElkIjogIkRBVEFGQUNUT1JZQEZDMDNFNzI0LUM0RjgtNEYxQy05MjVBLUREQTNDNjE5NDgwRl83ZjAzZWNmMi1jNjY3LTQ0N2UtYTJjZC0zYjRhZTdkM2IyNmQiDQp9"
+		}
+	}
+}

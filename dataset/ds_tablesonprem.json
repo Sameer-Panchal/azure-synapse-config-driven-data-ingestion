@@ -1,0 +1,34 @@
+{
+	"name": "ds_tablesonprem",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "OnPremSqlServer",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"src_param_db": "AdventureWorksLT2025"
+			}
+		},
+		"parameters": {
+			"src_param_schema": {
+				"type": "string"
+			},
+			"src_param_table": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "SqlServerTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": {
+				"value": "@dataset().src_param_schema",
+				"type": "Expression"
+			},
+			"table": {
+				"value": "@dataset().src_param_table",
+				"type": "Expression"
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

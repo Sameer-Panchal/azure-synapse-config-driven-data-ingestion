@@ -1,0 +1,560 @@
+{
+	"name": "pl_copy_onprem_adls",
+	"properties": {
+		"activities": [
+			{
+				"name": "script_to_read_config",
+				"type": "Script",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "AzureSynapseDB",
+					"type": "LinkedServiceReference"
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "Query",
+							"text": "Select * from [CONTROL].[sytblconfig]\nwhere IS_ACTIVE = 1"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "ForEach1",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "script_to_read_config",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('script_to_read_config').output.resultSets[0].rows",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "metadataofsqldb",
+							"type": "GetMetadata",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "ds_tablesonprem",
+									"type": "DatasetReference",
+									"parameters": {
+										"src_param_schema": {
+											"value": "@item().SRC_SCHEMA",
+											"type": "Expression"
+										},
+										"src_param_table": {
+											"value": "@item().SRC_TABLE",
+											"type": "Expression"
+										}
+									}
+								},
+								"fieldList": [
+									"exists"
+								]
+							}
+						},
+						{
+							"name": "If Condition1",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "metadataofsqldb",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@equals(item().INCREMENTAL_FLAG,'Y')",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "Copy data3_full",
+										"description": "Copy from SQL to ADLS Gen2- Full Copy",
+										"type": "Copy",
+										"dependsOn": [
+											{
+												"activity": "Script1",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "SqlServerSource",
+												"queryTimeout": "02:00:00",
+												"partitionOption": "None"
+											},
+											"sink": {
+												"type": "DelimitedTextSink",
+												"storeSettings": {
+													"type": "AzureBlobFSWriteSettings"
+												},
+												"formatSettings": {
+													"type": "DelimitedTextWriteSettings",
+													"quoteAllText": true,
+													"fileExtension": ".txt"
+												}
+											},
+											"enableStaging": false,
+											"translator": {
+												"type": "TabularTranslator",
+												"typeConversion": true,
+												"typeConversionSettings": {
+													"allowDataTruncation": true,
+													"treatBooleanAsNumber": false
+												}
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "ds_tablesonprem",
+												"type": "DatasetReference",
+												"parameters": {
+													"src_param_schema": {
+														"value": "@item().SRC_SCHEMA",
+														"type": "Expression"
+													},
+													"src_param_table": {
+														"value": "@item().SRC_TABLE",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "ds_sink",
+												"type": "DatasetReference",
+												"parameters": {
+													"sink_param_container": {
+														"value": "@item().SINK_CONTAINER",
+														"type": "Expression"
+													},
+													"sink_param_folder": {
+														"value": "@item().SINK_FOLDER",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "Copy data3",
+										"type": "Copy",
+										"dependsOn": [
+											{
+												"activity": "Copy data3_full",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "DelimitedTextSource",
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": true,
+													"wildcardFolderPath": {
+														"value": "@concat(item().SINK_FOLDER,'/',formatDateTime(utcNow(),'yyyy-MM-dd'))",
+														"type": "Expression"
+													},
+													"wildcardFileName": "*.txt",
+													"enablePartitionDiscovery": false
+												},
+												"formatSettings": {
+													"type": "DelimitedTextReadSettings"
+												}
+											},
+											"sink": {
+												"type": "SqlDWSink",
+												"allowCopyCommand": true
+											},
+											"enableStaging": true,
+											"stagingSettings": {
+												"linkedServiceName": {
+													"referenceName": "ls_sgsynapsesql",
+													"type": "LinkedServiceReference"
+												}
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "ds_sink",
+												"type": "DatasetReference",
+												"parameters": {
+													"sink_param_container": {
+														"value": "@item().SINK_CONTAINER",
+														"type": "Expression"
+													},
+													"sink_param_folder": {
+														"value": "@item().SINK_FOLDER",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "AzureSynapseDB",
+												"type": "DatasetReference",
+												"parameters": {
+													"ds_param_schema": {
+														"value": "@item().SRC_SCHEMA",
+														"type": "Expression"
+													},
+													"ds_param_table": {
+														"value": "@item().SRC_TABLE",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "Script1",
+										"type": "Script",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"linkedServiceName": {
+											"referenceName": "AzureSynapseDB",
+											"type": "LinkedServiceReference"
+										},
+										"typeProperties": {
+											"scripts": [
+												{
+													"type": "Query",
+													"text": {
+														"value": "truncate table @{item().src_schema}.@{item().src_table}",
+														"type": "Expression"
+													}
+												}
+											],
+											"scriptBlockExecutionTimeout": "02:00:00"
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "Lookup1",
+										"description": "for checking maxupdatetime in sourcetable",
+										"type": "Lookup",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "SqlServerSource",
+												"sqlReaderQuery": {
+													"value": "SELECT MAX(@{item().DELTA_COL}) AS maxvalue FROM @{item().SRC_SCHEMA}.@{item().SRC_TABLE}",
+													"type": "Expression"
+												},
+												"queryTimeout": "02:00:00",
+												"partitionOption": "None"
+											},
+											"dataset": {
+												"referenceName": "ds_tablesonprem",
+												"type": "DatasetReference",
+												"parameters": {
+													"src_param_schema": {
+														"value": "@item().SRC_SCHEMA",
+														"type": "Expression"
+													},
+													"src_param_table": {
+														"value": "@item().SRC_TABLE",
+														"type": "Expression"
+													}
+												}
+											},
+											"firstRowOnly": true
+										}
+									},
+									{
+										"name": "Copy data1",
+										"type": "Copy",
+										"dependsOn": [
+											{
+												"activity": "Lookup1",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "SqlServerSource",
+												"sqlReaderQuery": {
+													"value": "@concat(item().QUERY,' WHERE ',item().DELTA_COL,' > ''',item().LPV,'''')",
+													"type": "Expression"
+												},
+												"queryTimeout": "02:00:00",
+												"partitionOption": "None"
+											},
+											"sink": {
+												"type": "DelimitedTextSink",
+												"storeSettings": {
+													"type": "AzureBlobFSWriteSettings"
+												},
+												"formatSettings": {
+													"type": "DelimitedTextWriteSettings",
+													"quoteAllText": true,
+													"fileExtension": ".txt"
+												}
+											},
+											"enableStaging": false,
+											"translator": {
+												"type": "TabularTranslator",
+												"typeConversion": true,
+												"typeConversionSettings": {
+													"allowDataTruncation": true,
+													"treatBooleanAsNumber": false
+												}
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "ds_tablesonprem",
+												"type": "DatasetReference",
+												"parameters": {
+													"src_param_schema": "'",
+													"src_param_table": "'"
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "ds_sink",
+												"type": "DatasetReference",
+												"parameters": {
+													"sink_param_container": {
+														"value": "@ITEM().SINK_CONTAINER",
+														"type": "Expression"
+													},
+													"sink_param_folder": {
+														"value": "@ITEM().SINK_FOLDER",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "Stored procedure1",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Copy data1",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[dbo].[sytblconfig_usp]",
+											"storedProcedureParameters": {
+												"LPV": {
+													"value": {
+														"value": "@activity('Lookup1').output.firstRow.maxvalue",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"SRC_TABLE": {
+													"value": {
+														"value": "@item().SRC_TABLE",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "AzureSynapseDB",
+											"type": "LinkedServiceReference"
+										}
+									},
+									{
+										"name": "Copy data2",
+										"type": "Copy",
+										"dependsOn": [
+											{
+												"activity": "Stored procedure1",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "DelimitedTextSource",
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": true,
+													"wildcardFolderPath": {
+														"value": "@concat(item().SINK_FOLDER,'/',formatDateTime(utcNow(),'yyyy-MM-dd'))",
+														"type": "Expression"
+													},
+													"wildcardFileName": "*.txt",
+													"enablePartitionDiscovery": false
+												},
+												"formatSettings": {
+													"type": "DelimitedTextReadSettings"
+												}
+											},
+											"sink": {
+												"type": "SqlDWSink",
+												"writeBehavior": "Upsert",
+												"upsertSettings": {
+													"keys": {
+														"value": "@array(split(item().KeyColumn,','))",
+														"type": "Expression"
+													},
+													"interimSchemaName": ""
+												},
+												"disableMetricsCollection": false
+											},
+											"enableStaging": true,
+											"stagingSettings": {
+												"linkedServiceName": {
+													"referenceName": "ls_sgsynapsesql",
+													"type": "LinkedServiceReference"
+												}
+											},
+											"translator": {
+												"type": "TabularTranslator",
+												"typeConversion": true,
+												"typeConversionSettings": {
+													"allowDataTruncation": true,
+													"treatBooleanAsNumber": false
+												}
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "ds_sink",
+												"type": "DatasetReference",
+												"parameters": {
+													"sink_param_container": {
+														"value": "@item().SINK_CONTAINER",
+														"type": "Expression"
+													},
+													"sink_param_folder": {
+														"value": "@item().SINK_FOLDER",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "AzureSynapseDB",
+												"type": "DatasetReference",
+												"parameters": {
+													"ds_param_schema": {
+														"value": "@item().SRC_SCHEMA",
+														"type": "Expression"
+													},
+													"ds_param_table": {
+														"value": "@item().SRC_TABLE",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		],
+		"annotations": [],
+		"lastPublishTime": "2026-06-03T11:36:01Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

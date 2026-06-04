@@ -1,0 +1,64 @@
+{
+	"name": "pl_copy_tblconfig",
+	"properties": {
+		"activities": [
+			{
+				"name": "cp_query",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlServerSource",
+						"sqlReaderQuery": "select \na.table_catalog as SRC_CATALOG,\na.table_schema as SRC_SCHEMA,\na.table_name as SRC_TABLE,\n'landing' as SINK_CONTAINER,\n'/'+a.table_name as SINK_FOLDER,\n'select '+STRING_AGG(b.column_name,',')+ ' from '+a.table_schema+'.'+a.table_name as QUERY,\n'ModifiedDate' as DELTA_COL,\n'1995-01-01 00:00:00.000' as LPV,\n'Y' as INCREMENTAL_FLAG ,\n1 as IS_ACTIVE,\n'' as KeyColumn\nfrom information_schema.tables as a \njoin information_schema.columns as b\non a.table_name=b.table_name and a.table_schema=b.table_schema\nwhere a.table_type like ('Base table')\nand a.table_schema not in ('dbo')\ngroup by a.table_catalog,\na.table_schema,\na.table_name,\na.table_type\n",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "SqlDWSink",
+						"allowCopyCommand": true,
+						"tableOption": "autoCreate",
+						"disableMetricsCollection": false
+					},
+					"enableStaging": true,
+					"stagingSettings": {
+						"linkedServiceName": {
+							"referenceName": "ls_sgsynapsesql",
+							"type": "LinkedServiceReference"
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_tablesonprem",
+						"type": "DatasetReference",
+						"parameters": {
+							"src_param_schema": ".",
+							"src_param_table": "."
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "AzureSynapseDB",
+						"type": "DatasetReference",
+						"parameters": {
+							"ds_param_schema": "CONTROL",
+							"ds_param_table": "sytblconfig"
+						}
+					}
+				]
+			}
+		],
+		"annotations": [],
+		"lastPublishTime": "2026-06-03T07:51:54Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
